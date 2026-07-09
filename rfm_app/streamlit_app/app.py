@@ -40,6 +40,8 @@ st.set_page_config(
 EMERALD = "#0F6B5C"
 EMERALD_DARK = "#0B4F44"
 GOLD = "#C9A24B"
+GOLD_LIGHT = "#E8CD8A"
+CREAM = "#FAF7EF"
 SEGMENT_ORDER = [
     "Premium Donor", "Loyal Donor", "Reactivated Donor", "Active Donor",
     "Potential Donor", "New Donor", "Small/Occasional Donor",
@@ -53,16 +55,59 @@ SEGMENT_COLORS = {
 
 DEFAULT_DATA_PATH = Path(__file__).parent / "data" / "data_set_donasi_ma_2020_2025.csv"
 
+# --- Tema Visual Mizan Amanah (branding & konsistensi desain) -------------
 st.markdown(
     f"""
     <style>
-    .stMetric {{ background-color: #EEF5F3; border-radius: 10px; padding: 10px 14px; }}
+    .stApp {{ background-color: {CREAM}; }}
+    [data-testid="stSidebar"] {{ background-color: {EMERALD_DARK}; }}
+    [data-testid="stSidebar"] * {{ color: #FFFFFF !important; }}
+    [data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] {{ background-color: {GOLD} !important; }}
+    .stMetric {{
+        background-color: #FFFFFF; border-radius: 10px; padding: 10px 14px;
+        border-top: 4px solid {GOLD}; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }}
     div[data-testid="stMetricValue"] {{ color: {EMERALD_DARK}; }}
+    div[data-testid="stMetricLabel"] {{ color: {EMERALD_DARK}; font-weight: 600; }}
     h1, h2, h3 {{ color: {EMERALD_DARK}; }}
+    .mizan-header {{
+        background: linear-gradient(90deg, {EMERALD} 0%, {EMERALD_DARK} 100%);
+        padding: 1.3rem 1.7rem; border-radius: 10px; margin-bottom: 1rem;
+        border-left: 6px solid {GOLD};
+    }}
+    .mizan-header h1 {{ color: #FFFFFF !important; margin: 0; font-size: 1.55rem; }}
+    .mizan-header p {{ color: {GOLD_LIGHT}; margin: 0.25rem 0 0 0; font-size: 0.92rem; }}
+    .stTabs [data-baseweb="tab"] {{ font-weight: 600; color: {EMERALD_DARK}; }}
+    .stTabs [aria-selected="true"] {{ color: {GOLD} !important; border-bottom-color: {GOLD} !important; }}
+    .insight-box {{
+        background-color: #FFFFFF; border-left: 5px solid {GOLD}; border-radius: 6px;
+        padding: 0.85rem 1.05rem; margin: 0.5rem 0;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+# --- Compact number format (11.23M, 245.6K) -------------------------------
+def compact_number(n, decimals=2):
+    try:
+        n = float(n)
+    except (TypeError, ValueError):
+        return str(n)
+    sign = "-" if n < 0 else ""
+    n = abs(n)
+    if n >= 1_000_000_000:
+        return f"{sign}{n/1_000_000_000:.{decimals}f}B"
+    if n >= 1_000_000:
+        return f"{sign}{n/1_000_000:.{decimals}f}M"
+    if n >= 1_000:
+        return f"{sign}{n/1_000:.1f}K"
+    return f"{sign}{n:,.0f}"
+
+
+def rupiah_compact(x):
+    return f"Rp{compact_number(x)}"
 
 # ----------------------------------------------------------------------------
 # 1-2) LOAD DATA
@@ -275,20 +320,26 @@ st.sidebar.caption(
 # ----------------------------------------------------------------------------
 # HEADER
 # ----------------------------------------------------------------------------
-st.title("RFM Segmentation & Donor Ladder Intelligence")
-st.caption(
-    "Dashboard interaktif — mereplikasi pipeline analitik pada notebook final "
-    "`RFM_Mizan_Amanah_revisi.ipynb` (9 segmen Tangga Donatur, bukan model generik e-commerce)."
+st.markdown(
+    """
+    <div class="mizan-header">
+      <h1>RFM Segmentation &amp; Donor Ladder Intelligence</h1>
+      <p>Dashboard interaktif — mereplikasi pipeline analitik pada notebook final
+      RFM_Mizan_Amanah_revisi.ipynb (9 segmen Tangga Donatur, bukan model generik e-commerce)</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
-# KPI row (berdasarkan filter aktif)
+# KPI row (berdasarkan filter aktif) — compact number format
 k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric("Total Donor (terfilter)", f"{len(agg_f):,}", f"dari {len(agg):,} total")
-k2.metric("Total Transaksi", f"{agg_f['Frequency'].sum():,}")
-k3.metric("Total Nominal", rupiah(agg_f["Monetary"].sum()))
-k4.metric("Rata-rata Nominal/Donor", rupiah(agg_f["Monetary"].mean()) if len(agg_f) else "Rp0")
+k1.metric("Total Donor (terfilter)", compact_number(len(agg_f), decimals=1),
+          f"dari {compact_number(len(agg), decimals=1)} total")
+k2.metric("Total Transaksi", compact_number(agg_f["Frequency"].sum(), decimals=1))
+k3.metric("Total Nominal", rupiah_compact(agg_f["Monetary"].sum()))
+k4.metric("Rata-rata Nominal/Donor", rupiah_compact(agg_f["Monetary"].mean()) if len(agg_f) else "Rp0")
 high_value_n = int(agg_f["High_Value_Donor"].sum()) if len(agg_f) else 0
-k5.metric("Donor High-Value", f"{high_value_n:,}")
+k5.metric("Donor High-Value", compact_number(high_value_n, decimals=1))
 
 st.markdown("---")
 
@@ -335,17 +386,22 @@ with tab1:
             fig_pie.update_layout(height=420)
             st.plotly_chart(fig_pie, width="stretch")
 
-        st.subheader("Ringkasan Segmen")
+        st.subheader("Dashboard Summary")
         disp = segment_summary.copy()
-        disp["Total_Monetary"] = disp["Total_Monetary"].apply(rupiah)
-        disp["Rata2_Monetary"] = disp["Rata2_Monetary"].apply(rupiah)
+        disp["Jumlah_Donor"] = disp["Jumlah_Donor"].apply(lambda v: compact_number(v, decimals=1))
+        disp["Total_Monetary"] = disp["Total_Monetary"].apply(rupiah_compact)
+        disp["Rata2_Monetary"] = disp["Rata2_Monetary"].apply(rupiah_compact)
+        disp["Persentase_Donor"] = disp["Persentase_Donor"].apply(lambda v: f"{v:.1f}%")
+        disp["Persentase_Nominal"] = disp["Persentase_Nominal"].apply(lambda v: f"{v:.1f}%")
         disp.columns = ["Segment", "Jumlah Donor", "Total Nominal", "Rata-rata Nominal", "% Donor", "% Nominal"]
         st.dataframe(disp, width="stretch", hide_index=True)
 
         top_seg = segment_summary.sort_values("Persentase_Nominal", ascending=False).iloc[0]
-        st.info(
-            f"💡 **Insight**: Segmen **{top_seg['Segment']}** menyumbang **{top_seg['Persentase_Nominal']}%** "
-            f"dari total nominal pada filter saat ini, dari **{top_seg['Persentase_Donor']}%** populasi donor."
+        st.markdown(
+            f"""<div class="insight-box">💡 <b>Insight:</b> Segmen <b>{top_seg['Segment']}</b> menyumbang
+            <b>{top_seg['Persentase_Nominal']:.1f}%</b> dari total nominal pada filter saat ini, dari
+            <b>{top_seg['Persentase_Donor']:.1f}%</b> populasi donor.</div>""",
+            unsafe_allow_html=True,
         )
 
 # ============================================================ TAB 2 =========
@@ -353,22 +409,43 @@ with tab2:
     if monthly_trend_f.empty:
         st.warning("Tidak ada data transaksi pada filter saat ini.")
     else:
+        monthly_sorted = monthly_trend_f.sort_values("year_month")
         fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
         fig_trend.add_trace(
-            go.Scatter(x=monthly_trend_f["year_month"], y=monthly_trend_f["Total_Nominal"],
-                       name="Total Nominal", mode="lines+markers", line=dict(color=EMERALD, width=2)),
+            go.Bar(x=monthly_sorted["year_month"], y=monthly_sorted["Jumlah_Transaksi"],
+                   name="Jumlah Donasi (Count)", marker_color=GOLD, opacity=0.85),
             secondary_y=False,
         )
         fig_trend.add_trace(
-            go.Scatter(x=monthly_trend_f["year_month"], y=monthly_trend_f["Jumlah_Transaksi"],
-                       name="Jumlah Transaksi", mode="lines+markers", line=dict(color=GOLD, width=2)),
+            go.Scatter(x=monthly_sorted["year_month"], y=monthly_sorted["Total_Nominal"],
+                       name="Nominal Donasi (Amount)", mode="lines+markers",
+                       line=dict(color=EMERALD_DARK, width=2.5), marker=dict(size=5)),
             secondary_y=True,
         )
-        fig_trend.update_layout(title="Tren Donasi Bulanan (Nominal vs Jumlah Transaksi)", height=420,
-                                 legend=dict(orientation="h", yanchor="bottom", y=1.02))
-        fig_trend.update_yaxes(title_text="Total Nominal (Rp)", secondary_y=False)
-        fig_trend.update_yaxes(title_text="Jumlah Transaksi", secondary_y=True)
+        tick_idx = list(range(0, len(monthly_sorted), 6)) or [0]
+        fig_trend.update_layout(
+            title="Tren Donasi Bulanan — Jumlah Donasi (Bar) vs Nominal Donasi (Line)",
+            height=440,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hovermode="x unified",
+            xaxis=dict(
+                title="Bulan", tickangle=-45, tickmode="array",
+                tickvals=[monthly_sorted["year_month"].iloc[i] for i in tick_idx if i < len(monthly_sorted)],
+            ),
+            margin=dict(b=70),
+        )
+        fig_trend.update_yaxes(title_text="Jumlah Donasi (Count)", secondary_y=False, showgrid=False)
+        fig_trend.update_yaxes(title_text="Nominal Donasi (Rp)", secondary_y=True, showgrid=False, tickformat=".2s")
         st.plotly_chart(fig_trend, width="stretch")
+
+        if len(monthly_sorted):
+            peak = monthly_sorted.loc[monthly_sorted["Total_Nominal"].idxmax()]
+            st.markdown(
+                f"""<div class="insight-box">💡 <b>Insight:</b> Nominal donasi tertinggi tercatat pada
+                <b>{peak['year_month']}</b> sebesar <b>{rupiah_compact(peak['Total_Nominal'])}</b>
+                dari <b>{compact_number(peak['Jumlah_Transaksi'], decimals=1)}</b> transaksi.</div>""",
+                unsafe_allow_html=True,
+            )
 
         c1, c2 = st.columns([3, 2])
         with c1:
@@ -407,40 +484,138 @@ with tab3:
         c1, c2, c3 = st.columns(3)
         with c1:
             fig_r = px.histogram(agg_f, x="Recency", nbins=50, color_discrete_sequence=["#E07A5F"],
-                                  title="Distribusi Recency (hari)")
-            fig_r.update_layout(height=380, xaxis_title="Hari sejak donasi terakhir", yaxis_title="Jumlah Donor")
+                                  title="Recency — Berapa Lama Donor Tidak Aktif (hari sejak donasi terakhir)")
+            fig_r.update_layout(height=400, xaxis_title="Hari sejak donasi terakhir", yaxis_title="Jumlah Donor")
+            fig_r.add_vline(x=90, line_dash="dash", line_color=EMERALD_DARK,
+                             annotation_text="Ambang Dormant (>90 hari)", annotation_position="top right")
             st.plotly_chart(fig_r, width="stretch")
         with c2:
             freq_clip = agg_f["Frequency"].clip(upper=30)
             fig_f = px.histogram(x=freq_clip, nbins=30, color_discrete_sequence=["#3D7EA6"],
-                                  title="Distribusi Frequency (maks. 30x)")
-            fig_f.update_layout(height=380, xaxis_title="Jumlah Transaksi", yaxis_title="Jumlah Donor")
+                                  title="Frequency — Jumlah Transaksi per Donor (dibatasi maks. 30x)")
+            fig_f.update_layout(height=400, xaxis_title="Jumlah Transaksi", yaxis_title="Jumlah Donor")
+            n_single = int((agg_f["Frequency"] == 1).sum())
+            fig_f.add_annotation(
+                x=1, y=n_single, text=f"Mayoritas donor\nbertransaksi 1x ({compact_number(n_single, decimals=1)})",
+                showarrow=True, arrowhead=2, ax=50, ay=-40, font=dict(size=11),
+            )
             st.plotly_chart(fig_f, width="stretch")
         with c3:
             log_monetary = np.log1p(agg_f["Monetary"])
             fig_m = px.histogram(x=log_monetary, nbins=50, color_discrete_sequence=["#3FA796"],
-                                  title="Distribusi Monetary (skala log)")
-            fig_m.update_layout(height=380, xaxis_title="log(1 + Nilai Total Donasi)", yaxis_title="Jumlah Donor")
+                                  title="Monetary — Total Nominal Donasi per Donor (skala logaritmik)")
+            fig_m.update_layout(height=400, xaxis_title="log(1 + Total Nominal Donasi)", yaxis_title="Jumlah Donor")
+            fig_m.add_annotation(
+                x=log_monetary.median(), y=0, yshift=-45,
+                text="Skala log dipakai karena rentang nominal sangat lebar",
+                showarrow=False, font=dict(size=10, color=EMERALD_DARK),
+            )
             st.plotly_chart(fig_m, width="stretch")
 
-        st.caption(
-            "Mayoritas donor cenderung berada pada recency tinggi (tidak aktif) & frequency rendah, "
-            "sejalan dengan dominasi segmen Lost & Dormant Donor pada hasil klasifikasi."
+        st.markdown(
+            """<div class="insight-box">💡 <b>Insight:</b> Mayoritas donor berada pada recency tinggi
+            (lama tidak berdonasi) dan frequency rendah (hanya 1–2x transaksi) — sejalan dengan dominasi
+            segmen <b>Lost Donor</b> dan <b>Dormant Donor</b> pada hasil klasifikasi.</div>""",
+            unsafe_allow_html=True,
         )
 
 # ============================================================ TAB 4 =========
+STRATEGY_BREAKDOWN = {
+    "Reactivated Donor": {
+        "objective": "Memastikan pengalaman donasi mulus & mencegah kembali vakum",
+        "strategy": "Sambutan hangat (welcome back) + apresiasi personal atas kembalinya donasi",
+        "channel": "WhatsApp personal message, Email",
+        "campaign": "Kampanye 'Selamat Datang Kembali' dengan update dampak donasi terbaru",
+    },
+    "Premium Donor": {
+        "objective": "Mempererat relasi & mempertahankan donor bernilai tertinggi",
+        "strategy": "Pendekatan personal lewat relationship manager; laporan dampak donasi mendalam",
+        "channel": "Pertemuan tatap muka / telepon langsung, undangan VIP",
+        "campaign": "Event eksklusif (gala/donor appreciation) & laporan dampak tahunan personal",
+    },
+    "Loyal Donor": {
+        "objective": "Mempertahankan loyalitas donor yang stabil & rutin",
+        "strategy": "Laporan dampak donasi (impact report) personal & komunikasi rutin",
+        "channel": "Email personal, telepon check-in berkala",
+        "campaign": "Program apresiasi loyalitas / sertifikat donatur setia",
+    },
+    "Potential Donor": {
+        "objective": "Konversi menjadi donor loyal dengan komitmen jangka panjang",
+        "strategy": "Tawarkan program donasi rutin bulanan (subscription) + laporan impact personal",
+        "channel": "Telepon/follow-up personal, Email laporan dampak",
+        "campaign": "Program 'Sahabat Berkah' — paket donasi rutin dengan benefit eksklusif",
+    },
+    "Active Donor": {
+        "objective": "Menjaga konsistensi donasi & mendorong ke donasi rutin",
+        "strategy": "Reminder rutin bulanan + edukasi manfaat donasi konsisten",
+        "channel": "WhatsApp blast, Email reminder",
+        "campaign": "Ajakan aktivasi autodebet/langganan donasi bulanan",
+    },
+    "New Donor": {
+        "objective": "Membangun kesan pertama positif & mendorong donasi kedua",
+        "strategy": "Ucapan terima kasih + onboarding info program; follow-up dalam 7-14 hari",
+        "channel": "WhatsApp/Email otomatis, SMS reminder",
+        "campaign": "Welcome series — cerita dampak donasi pertama mereka",
+    },
+    "Small/Occasional Donor": {
+        "objective": "Meningkatkan frekuensi & nilai donasi lewat edukasi emosional",
+        "strategy": "Edukasi ringan via konten emosional (kisah mustahik); ajak campaign musiman",
+        "channel": "Media sosial (Instagram/Facebook), Email newsletter",
+        "campaign": "Campaign musiman Ramadhan/Qurban + seri storytelling mustahik",
+    },
+    "Lost Donor": {
+        "objective": "Evaluasi prioritas reaktivasi dengan biaya rendah",
+        "strategy": "Campaign storytelling & pengingat ringan (low-touch, low cost)",
+        "channel": "Email broadcast, media sosial (tanpa personalisasi tinggi)",
+        "campaign": "Newsletter reguler berisi update dampak & program terbaru",
+    },
+    "Dormant Donor": {
+        "objective": "Reaktivasi donor berpotensi tinggi (kontribusi nominal historis besar)",
+        "strategy": "Kampanye reaktivasi (win-back) bertarget + insentif kecil",
+        "channel": "Email/WhatsApp win-back campaign, retargeting ads",
+        "campaign": "Campaign 'Kembali Berbagi' dengan cerita dampak terbaru & insentif donasi awal",
+    },
+}
+
 with tab4:
     st.subheader("Kriteria Klasifikasi 9 Segmen (Segment Mapping)")
     st.dataframe(segment_mapping, width="stretch", hide_index=True)
 
-    st.subheader("Rekomendasi Strategi Engagement per Segmen")
-    pilih_segmen = st.selectbox("Pilih segmen untuk detail strategi:", SEGMENT_ORDER)
-    st.success(f"**{pilih_segmen}** → {seg_to_reco[pilih_segmen]}")
+    st.subheader("Strategi & Rekomendasi — Breakdown per Segmen RFM")
+    st.caption(
+        "Setiap segmen dipetakan ke Tujuan (Objective), Strategi Engagement, Channel Komunikasi, "
+        "dan Campaign/Aksi yang direkomendasikan."
+    )
+    pilih_segmen = st.selectbox("Pilih segmen untuk melihat detail strategi:", SEGMENT_ORDER)
+    detail = STRATEGY_BREAKDOWN[pilih_segmen]
+    color = SEGMENT_COLORS.get(pilih_segmen, EMERALD)
+    st.markdown(
+        f"""
+        <div style="background:#FFFFFF; border-left:6px solid {color}; border-radius:8px;
+                    padding:1.1rem 1.3rem; margin-bottom:1rem;">
+          <h4 style="color:{EMERALD_DARK}; margin-top:0;">{pilih_segmen}</h4>
+          <p><b>🎯 Tujuan (Objective):</b><br>{detail['objective']}</p>
+          <p><b>🤝 Strategi Engagement:</b><br>{detail['strategy']}</p>
+          <p><b>📢 Channel Komunikasi:</b><br>{detail['channel']}</p>
+          <p><b>🚀 Campaign/Aksi Direkomendasikan:</b><br>{detail['campaign']}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    reco_df = pd.DataFrame({"Segment": list(seg_to_reco.keys()), "Strategi": list(seg_to_reco.values())})
+    reco_df = pd.DataFrame([
+        {
+            "Segment": seg,
+            "Objective (Tujuan)": v["objective"],
+            "Strategi Engagement": v["strategy"],
+            "Channel Komunikasi": v["channel"],
+            "Campaign/Aksi": v["campaign"],
+        }
+        for seg, v in STRATEGY_BREAKDOWN.items()
+    ])
     reco_df["Segment"] = pd.Categorical(reco_df["Segment"], categories=SEGMENT_ORDER, ordered=True)
     reco_df = reco_df.sort_values("Segment")
-    with st.expander("Lihat semua rekomendasi strategi (9 segmen)"):
+    with st.expander("Lihat tabel lengkap breakdown strategi seluruh 9 segmen"):
         st.dataframe(reco_df, width="stretch", hide_index=True)
 
 # ============================================================ TAB 5 =========
